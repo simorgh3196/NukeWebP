@@ -28,17 +28,13 @@ public class WebPImageDecoder: ImageDecoding {
         self.decoder = decoder
     }
     
-    public func decode(_ data: Data) -> ImageContainer? {
-        do {
-            return try _queue.sync(execute: {
-                let image = try decoder.decode(data: data)
-                return ImageContainer(image: image, type: .webp, data: data)
-            })
-        } catch {
-            return nil
-        }
+    public func decode(_ data: Data) throws -> ImageContainer {
+        try _queue.sync(execute: {
+            let image = try decoder.decode(data: data)
+            return ImageContainer(image: image, type: .webp, data: data)
+        })
     }
-    
+
     public func decodePartiallyDownloadedData(_ data: Data) -> ImageContainer? {
         do {
             return try _queue.sync(execute: {
