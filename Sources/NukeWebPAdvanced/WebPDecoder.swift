@@ -208,7 +208,7 @@ public final class WebPDecoder: @unchecked Sendable {
     }
     
     internal func makeConfig(_ options: WebPDecoderOptions,
-                            _ colorspace: ColorspaceMode) -> WebPDecoderConfig {
+                             _ colorspace: ColorspaceMode) -> WebPDecoderConfig {
         var config = WebPDecoderConfig()
         config.options = options
         config.output.colorspace = colorspace
