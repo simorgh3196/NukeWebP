@@ -13,18 +13,18 @@ public typealias ImageType = UIImage
 public typealias ImageType = NSImage
 #endif
 
-public protocol WebPDecoding: AnyObject {
+public protocol WebPDecoding: AnyObject, Sendable {
     func decode(data: Data) throws -> ImageType
     func decodei(data: Data) throws -> ImageType
 }
 
 private let _queue = DispatchQueue(label: "com.webp.decoder", autoreleaseFrequency: .workItem)
 
-public class WebPImageDecoder: ImageDecoding {
+public final class WebPImageDecoder: ImageDecoding, Sendable {
+
+    private let decoder: any WebPDecoding
     
-    private let decoder: WebPDecoding
-    
-    public init(decoder: WebPDecoding) {
+    public init(decoder: some WebPDecoding) {
         self.decoder = decoder
     }
     
@@ -50,18 +50,20 @@ public class WebPImageDecoder: ImageDecoding {
 // MARK: - check webp format data.
 extension WebPImageDecoder {
     
-    public static func enable(closure: @escaping () -> WebPDecoding) {
-        Nuke.ImageDecoderRegistry.shared.register { (context) -> ImageDecoding? in
+    public static func enable(closure: @escaping () -> some WebPDecoding) {
+        ImageDecoderRegistry.shared.register { (context) -> ImageDecoding? in
             WebPImageDecoder.enable(context: context, closure: closure)
         }
     }
     
-    public static func enable(auto closure: @escaping @autoclosure () -> WebPDecoding) {
-        Nuke.ImageDecoderRegistry.shared.register { (context) -> ImageDecoding? in
+    public static func enable(auto closure: @escaping @autoclosure () -> some WebPDecoding) {
+        ImageDecoderRegistry.shared.register { (context) -> ImageDecoding? in
             WebPImageDecoder.enable(context: context, closure: closure)
         }
     }
-    public static func enable(context: ImageDecodingContext, closure: @escaping () -> WebPDecoding) -> Nuke.ImageDecoding? {
+
+    public static func enable(context: ImageDecodingContext,
+                              closure: @escaping () -> some WebPDecoding) -> ImageDecoding? {
         /// Use native WebP decoder for decode image
         if #available(OSX 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
             return nil
