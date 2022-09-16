@@ -21,8 +21,8 @@ extension libwebp.WebPImageHint: ExpressibleByIntegerLiteral {
 
 
 // mapping from libwebp.WebPConfig
-public struct WebPEncoderConfig: InternalRawRepresentable {
-    public enum WebPImageHint: libwebp.WebPImageHint {
+public struct WebPEncoderConfig: InternalRawRepresentable, Sendable {
+    public enum WebPImageHint: libwebp.WebPImageHint, Sendable {
         case `default` = 0
         case picture = 1
         case photo = 2

@@ -15,16 +15,19 @@ public enum WebPDecodingError: UInt32, Error {
     case unknownError = 9999 // This is an own error to deal with internal problems
 }
 
-public final class WebPDecoder {
+private let _queue = DispatchQueue(label: "com.webp.decoder.advanced", autoreleaseFrequency: .workItem)
+
+public final class WebPDecoder: @unchecked Sendable {
     
     deinit {
-      if idec != nil {
-        WebPIDelete(idec)
-      }
+        _queue.sync(execute: {
+            if idec != nil {
+                WebPIDelete(idec)
+            }
+        })
     }
     
-    public init() {
-    }
+    public init() {}
     
     public func decode(byRGB webPData: Data, options: WebPDecoderOptions) throws -> Data {
         var config = makeConfig(options, .RGB)
@@ -172,39 +175,40 @@ public final class WebPDecoder {
         }
     }
     
-    var idec: OpaquePointer?
+    private var idec: OpaquePointer?
     
     internal func decodei(_ webPData: Data, config: inout WebPDecoderConfig) throws {
-        var mutableWebPData = webPData
-        if idec == nil {
-          idec = WebPINewRGB(MODE_rgbA, nil, 0, 0)
-        }
-        try mutableWebPData.withUnsafeMutableBytes { rawPtr in
-            
-            guard let bindedBasePtr = rawPtr.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
-                throw WebPDecodingError.unknownError
+        try _queue.sync(execute: {
+            var mutableWebPData = webPData
+            if idec == nil {
+                idec = WebPINewRGB(MODE_rgbA, nil, 0, 0)
             }
-            let status = WebPIUpdate(idec, bindedBasePtr, webPData.count)
-            if status != VP8_STATUS_OK && status != VP8_STATUS_SUSPENDED {
-                throw WebPDecodingError.unknownError
+            try mutableWebPData.withUnsafeMutableBytes { rawPtr in
+                guard let bindedBasePtr = rawPtr.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                    throw WebPDecodingError.unknownError
+                }
+                let status = WebPIUpdate(idec, bindedBasePtr, webPData.count)
+                if status != VP8_STATUS_OK && status != VP8_STATUS_SUSPENDED {
+                    throw WebPDecodingError.unknownError
+                }
+                var width: Int32 = 0
+                var height: Int32 = 0
+                var last_y: Int32 = 0
+                var stride: Int32 = 0
+                guard let rgba = WebPIDecGetRGB(idec, &last_y, &width, &height, &stride) else {
+                    throw WebPDecodingError.unknownError
+                }
+                let rgbaSize = stride * last_y
+                let buff = WebPRGBABuffer(rgba: rgba, stride: stride, size: Int(rgbaSize))
+                config.output.u = WebPDecBuffer.Colorspace.RGBA(buff)
+                config.output.height = Int(last_y)
+                config.output.width = Int(width)
             }
-            var width: Int32 = 0
-            var height: Int32 = 0
-            var last_y: Int32 = 0
-            var stride: Int32 = 0
-            guard let rgba = WebPIDecGetRGB(idec, &last_y, &width, &height, &stride) else {
-                throw WebPDecodingError.unknownError
-            }
-            let rgbaSize = stride * last_y
-            let buff = WebPRGBABuffer(rgba: rgba, stride: stride, size: Int(rgbaSize))
-            config.output.u = WebPDecBuffer.Colorspace.RGBA(buff)
-            config.output.height = Int(last_y)
-            config.output.width = Int(width)
-        }
+        })
     }
     
     internal func makeConfig(_ options: WebPDecoderOptions,
-                            _ colorspace: ColorspaceMode) -> WebPDecoderConfig {
+                             _ colorspace: ColorspaceMode) -> WebPDecoderConfig {
         var config = WebPDecoderConfig()
         config.options = options
         config.output.colorspace = colorspace

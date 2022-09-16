@@ -13,15 +13,19 @@ public enum BasicWebPDecoderError: Error {
     case underlyingError(Error)
 }
 
-public final class BasicWebPDecoder: WebPDecoding {
-  
+private let _queue = DispatchQueue(label: "com.webp.decoder.basic", autoreleaseFrequency: .workItem)
+
+public final class BasicWebPDecoder: WebPDecoding, @unchecked Sendable {
+
   deinit {
-    if idec != nil {
-      WebPIDelete(idec)
-    }
+    _queue.sync(execute: {
+      if idec != nil {
+        WebPIDelete(idec)
+      }
+    })
   }
-  
-  public init() { }
+
+  public init() {}
   
   public func decode(data: Data) throws -> ImageType {
     let image = try decodeCGImage(data: data)
@@ -43,89 +47,89 @@ public final class BasicWebPDecoder: WebPDecoding {
     #endif
   }
   
-  var idec: OpaquePointer?
-  
-  
+  private var idec: OpaquePointer?
   
   private func decodeiCGImage(data webPData: Data) throws -> CGImage {
-    var mutableWebPData = webPData
-    if idec == nil {
-      idec = WebPINewRGB(MODE_rgbA, nil, 0, 0)
-    }
-    return try mutableWebPData.withUnsafeMutableBytes { rawPtr in
-      guard let bindedBasePtr = rawPtr.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
-        throw BasicWebPDecoderError.unknownError
+    try _queue.sync(execute: {
+      var mutableWebPData = webPData
+      if idec == nil {
+        idec = WebPINewRGB(MODE_rgbA, nil, 0, 0)
       }
-            
-      let status = WebPIUpdate(idec, bindedBasePtr, webPData.count)
-      if status != VP8_STATUS_OK && status != VP8_STATUS_SUSPENDED {
-        throw BasicWebPDecoderError.unknownError
-      }
-      var width: Int32 = 0
-      var height: Int32 = 0
-      var last_y: Int32 = 0
-      var stride: Int32 = 0
-      if let rgba = WebPIDecGetRGB(idec, &last_y, &width, &height, &stride) {
-        
-        if (0 < width + height && 0 < last_y && last_y <= height) {
-          let rgbaSize = last_y * stride;
+      return try mutableWebPData.withUnsafeMutableBytes { rawPtr in
+        guard let bindedBasePtr = rawPtr.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+          throw BasicWebPDecoderError.unknownError
+        }
 
-          let data = Data(
-            bytesNoCopy: rgba,
-            count: Int(rgbaSize),
-            deallocator: .none
-          )
-          
-          guard let provider = CGDataProvider(data: data as CFData) else {
-            throw BasicWebPDecoderError.unknownError
-          }
-          let colorSpaceRef = CGColorSpaceCreateDeviceRGB()
-          let pixelLength: Int = 4
-          
-          let bitmapInfo: CGBitmapInfo = CGBitmapInfo(rawValue: (CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue))
-          
-          if let image = CGImage(
-            width: Int(width),
-            height: Int(last_y),
-            bitsPerComponent: 8,
-            bitsPerPixel: pixelLength * 8,
-            bytesPerRow: pixelLength * Int(width),
-            space: colorSpaceRef,
-            bitmapInfo: bitmapInfo,
-            provider: provider,
-            decode: nil,
-            shouldInterpolate: false,
-            intent: .defaultIntent
-          ) {
-            
-            let canvasColorSpaceRef = CGColorSpaceCreateDeviceRGB()
-            if let canvas = CGContext(
-              data: nil,
+        let status = WebPIUpdate(idec, bindedBasePtr, webPData.count)
+        if status != VP8_STATUS_OK && status != VP8_STATUS_SUSPENDED {
+          throw BasicWebPDecoderError.unknownError
+        }
+        var width: Int32 = 0
+        var height: Int32 = 0
+        var last_y: Int32 = 0
+        var stride: Int32 = 0
+        if let rgba = WebPIDecGetRGB(idec, &last_y, &width, &height, &stride) {
+
+          if (0 < width + height && 0 < last_y && last_y <= height) {
+            let rgbaSize = last_y * stride;
+
+            let data = Data(
+              bytesNoCopy: rgba,
+              count: Int(rgbaSize),
+              deallocator: .none
+            )
+
+            guard let provider = CGDataProvider(data: data as CFData) else {
+              throw BasicWebPDecoderError.unknownError
+            }
+            let colorSpaceRef = CGColorSpaceCreateDeviceRGB()
+            let pixelLength: Int = 4
+
+            let bitmapInfo: CGBitmapInfo = CGBitmapInfo(rawValue: (CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue))
+
+            if let image = CGImage(
               width: Int(width),
-              height: Int(height),
+              height: Int(last_y),
               bitsPerComponent: 8,
-              bytesPerRow: 0,
-              space: canvasColorSpaceRef,
-              bitmapInfo: bitmapInfo.rawValue
+              bitsPerPixel: pixelLength * 8,
+              bytesPerRow: pixelLength * Int(width),
+              space: colorSpaceRef,
+              bitmapInfo: bitmapInfo,
+              provider: provider,
+              decode: nil,
+              shouldInterpolate: false,
+              intent: .defaultIntent
             ) {
-              canvas.draw(
-                image,
-                in: .init(
-                  x: 0,
-                  y: Int(height) - Int(last_y),
-                  width: Int(width),
-                  height: Int(last_y)
+
+              let canvasColorSpaceRef = CGColorSpaceCreateDeviceRGB()
+              if let canvas = CGContext(
+                data: nil,
+                width: Int(width),
+                height: Int(height),
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: canvasColorSpaceRef,
+                bitmapInfo: bitmapInfo.rawValue
+              ) {
+                canvas.draw(
+                  image,
+                  in: .init(
+                    x: 0,
+                    y: Int(height) - Int(last_y),
+                    width: Int(width),
+                    height: Int(last_y)
+                  )
                 )
-              )
-              if let newImageRef = canvas.makeImage() {
-                return newImageRef
+                if let newImageRef = canvas.makeImage() {
+                  return newImageRef
+                }
               }
             }
           }
         }
+        throw BasicWebPDecoderError.unknownError
       }
-      throw BasicWebPDecoderError.unknownError
-    }
+    })
   }
   
   private func decodeCGImage(data webPData: Data) throws -> CGImage {

@@ -24,7 +24,7 @@ public enum WebPEncodeStatusCode: Int, Error {
     case last                  // list terminator. always last.
 }
 
-public struct WebPEncoder {
+public struct WebPEncoder: Sendable {
     typealias WebPPictureImporter = (UnsafeMutablePointer<WebPPicture>, UnsafeMutablePointer<UInt8>, Int32) -> Int32
 
     public init() {

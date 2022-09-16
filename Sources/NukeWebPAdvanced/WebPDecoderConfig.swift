@@ -1,7 +1,7 @@
 import Foundation
 import libwebp
 
-public struct WebPDecoderConfig: InternalRawRepresentable {
+public struct WebPDecoderConfig: InternalRawRepresentable, Sendable {
     public var input: WebPBitstreamFeatures?  // Immutable bitstream features (optional)
     public var output: WebPDecBuffer          // Output buffer (can point to external mem)
     public var options: WebPDecoderOptions    // Decoding options
@@ -25,8 +25,8 @@ public struct WebPDecoderConfig: InternalRawRepresentable {
     }
 }
 
-public struct WebPBitstreamFeatures: InternalRawRepresentable {
-    public enum Format: Int {
+public struct WebPBitstreamFeatures: InternalRawRepresentable, Sendable {
+    public enum Format: Int, Sendable {
         case undefined = 0
         case lossy
         case lossless
@@ -79,7 +79,7 @@ public struct WebPBitstreamFeatures: InternalRawRepresentable {
 // these two modes:
 // RGBA-4444: [b3 b2 b1 b0 a3 a2 a1 a0], [r3 r2 r1 r0 g3 g2 g1 g0], ...
 // RGB-565: [g2 g1 g0 b4 b3 b2 b1 b0], [r4 r3 r2 r1 r0 g5 g4 g3], ...
-public enum ColorspaceMode: Int {
+public enum ColorspaceMode: Int, Sendable {
     case RGB = 0
     case RGBA = 1
     case BGR = 2
@@ -118,8 +118,8 @@ public enum ColorspaceMode: Int {
     }
 }
 
-public struct WebPDecBuffer: InternalRawRepresentable {
-    public enum Colorspace {
+public struct WebPDecBuffer: InternalRawRepresentable, Sendable {
+    public enum Colorspace: Sendable {
         case RGBA(WebPRGBABuffer)
         case YUVA(WebPYUVABuffer)
 
@@ -191,7 +191,7 @@ public struct WebPDecBuffer: InternalRawRepresentable {
     }
 }
 
-public struct WebPDecoderOptions: InternalRawRepresentable {
+public struct WebPDecoderOptions: InternalRawRepresentable, Sendable {
     public var bypassFiltering: Int // if true, skip the in-loop filtering
 
     public var noFancyUpsampling: Int // if true, use faster pointwise upsampler

@@ -1,7 +1,7 @@
 import Foundation
 import libwebp
 
-public struct WebPImageInspector {
+public struct WebPImageInspector: Sendable {
 
     public static func inspect(_ webPData: Data) throws -> WebPBitstreamFeatures {
         let cFeature = UnsafeMutablePointer<libwebp.WebPBitstreamFeatures>.allocate(capacity: 1)
